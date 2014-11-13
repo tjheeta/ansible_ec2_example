@@ -18,3 +18,8 @@
     local_action: ec2_group name=rabbit_fw region="{{aws_region}}" description="rabbit_fw" state=absent 
   - name: Take worker_fw security group down
     local_action: ec2_group name=worker_fw region="{{aws_region}}" description="worker_fw" state=absent
+  - name: Remove asg config
+    local_action: ec2_asg name=worker_asg region="{{aws_region}}"  state=absent
+  - name: Remove launch config
+    local_action: ec2_lc name=worker_lc region="{{aws_region}}"  state=absent
+

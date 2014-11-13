@@ -100,6 +100,27 @@
     wait_for: state=started host={{ item.public_ip }} port=22
     with_items: ec2host_worker.tagged_instances
 
+  - name: setup the launch config for the autoscale group for workers with the user_data scripts 
+    ec2_lc:
+      name: worker_lc
+      image_id: "{{ ami_id }}"
+      key_name: "{{key_name}}"
+      region: "{{aws_region}}"
+      security_groups: "default,worker_fw"
+      instance_type: "{{ instance_type }}"
+      user_data: "{{ lookup('file', '/tmp/init_worker.sh') }}"
+    tags: launch_config
+
+  - name: setup the autoscaling group 
+    ec2_asg:
+      name: worker_asg
+      health_check_period: 60
+      launch_config_name: worker_lc
+      min_size: 2
+      max_size: 2
+      region: "{{aws_region}}"
+    tags: autoscale_group
+
 - name: configure the rabbit
   hosts: rabbit
   remote_user: ubuntu
@@ -114,4 +135,3 @@
   roles:
     - worker
 
-# setup the autoscaling group with the user_data scripts 

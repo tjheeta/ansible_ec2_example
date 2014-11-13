@@ -1,4 +1,4 @@
-key_name: test
+key_name: test_key
 aws_region: us-east-1
 ami_id: ami-f2c74d9a
 instance_type: t1.micro
