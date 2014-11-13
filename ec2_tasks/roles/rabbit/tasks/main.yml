@@ -1,0 +1,6 @@
+- name: install required packages
+  apt: name={{ item }} state=present update_cache=yes
+  with_items:
+    - vim
+    - tmux
+

@@ -1,0 +1,20 @@
+---
+# Basic decommissioning example
+- name: Delete devel EC2 instances
+  #hosts: security_group_worker_fw
+  hosts: ec2
+  connection: local
+  gather_facts: False
+  tasks:
+  - name: Terminate {{ec2_id}} instance in {{aws_region}}
+    local_action: ec2 state=absent region='{{ aws_region }}' instance_ids='{{ec2_id}}' wait=true
+
+- name: Delete security groups
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  tasks:
+  - name: Take rabbit_fw security group down
+    local_action: ec2_group name=rabbit_fw region="{{aws_region}}" description="rabbit_fw" state=absent 
+  - name: Take worker_fw security group down
+    local_action: ec2_group name=worker_fw region="{{aws_region}}" description="worker_fw" state=absent

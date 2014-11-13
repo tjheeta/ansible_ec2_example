@@ -1,0 +1,117 @@
+---
+# Basic provisioning example
+- name: Create AWS resources
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  tasks:
+  - name: Create security group
+    local_action:
+      module: ec2_group
+      name: rabbit_fw
+      description: "rabbit_fw"
+      region: "{{aws_region}}"
+      rules:
+        - proto: tcp
+          type: ssh
+          from_port: 22
+          to_port: 22
+          cidr_ip: 0.0.0.0/0
+      rules_egress:
+        - proto: all
+          type: all
+          cidr_ip: 0.0.0.0/0
+    register: rabbit_fw 
+
+  - name: Create security group
+    local_action:
+      module: ec2_group
+      name: worker_fw
+      description: "worker_fw"
+      region: "{{aws_region}}"
+      rules:
+        - proto: tcp
+          type: ssh
+          from_port: 22
+          to_port: 22
+          cidr_ip: 0.0.0.0/0
+      rules_egress:
+        - proto: all
+          type: all
+          cidr_ip: 0.0.0.0/0
+    register: worker_fw
+
+  - debug: var=worker_fw
+
+  - name: create rabbitmq instance
+    local_action:
+      module: ec2
+      key_name: "{{key_name}}"
+      region: "{{aws_region}}"
+      #group_id: "{{rabbit_fw.group_id}}"
+      group: [ "default", "rabbit_fw" ]
+      instance_type: "{{instance_type}}"
+      instance_tags:
+        group: rabbit
+      count_tag: 
+        group: rabbit
+      exact_count: 1
+      image: "{{ami_id}}"
+      user_data: "{{ lookup('file', 'init_rabbit.sh') }}"
+      wait: yes
+    register: ec2host_rabbit
+
+  - name: setup the internal rabbit ip script for userdata 
+    local_action: template src=worker_init_script.j2 dest=/tmp/init_worker.sh
+    with_items: ec2host_rabbit.tagged_instances
+
+  - name: create worker instance
+    local_action:
+      module: ec2
+      key_name: "{{key_name}}"
+      region: "{{aws_region}}"
+      group: [ "default", "worker_fw" ]
+      #group_id: "{{worker_fw.group_id}}"
+      instance_type: "{{instance_type}}"
+      exact_count: 1
+      instance_tags:
+        group: worker
+      count_tag:
+        group: worker
+      image: "{{ami_id}}"
+      user_data: "{{ lookup('file', '/tmp/init_worker.sh') }}"
+      wait: yes
+    register: ec2host_worker
+
+  - debug: var=ec2host_rabbit
+  - debug: var=ec2host_worker
+
+  - add_host: hostname={{ item.public_ip }} groupname=rabbit
+    with_items: ec2host_rabbit.tagged_instances
+
+  - add_host: hostname={{ item.public_ip }} groupname=workers
+    with_items: ec2host_worker.tagged_instances
+
+  # Can't combine these for some reason
+  - name: wait for rabbit instances to listen on port:22
+    wait_for: state=started host={{ item.public_ip }} port=22
+    with_items: ec2host_rabbit.tagged_instances
+  - name: wait for worker instances to listen on port:22
+    wait_for: state=started host={{ item.public_ip }} port=22
+    with_items: ec2host_worker.tagged_instances
+
+- name: configure the rabbit
+  hosts: rabbit
+  remote_user: ubuntu
+  sudo: true
+  roles:
+    - rabbit
+
+- name: configure the workers
+  hosts: workers
+  remote_user: ubuntu
+  sudo: true
+  roles:
+    - worker
+
+# setup the autoscaling group with the user_data scripts 
