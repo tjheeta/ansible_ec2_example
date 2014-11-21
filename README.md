@@ -1,5 +1,7 @@
+This playbook is to setup a rabbitmq host on ec2 with workers being created with an autoscale group.
+
     sudo apt-get install ansible
-    sudo apt-get install boto
+    sudo apt-get install python-boto
 
     $ cat ~/.boto 
     [Credentials]
